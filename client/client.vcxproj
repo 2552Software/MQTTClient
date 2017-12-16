@@ -90,7 +90,7 @@
       <AdditionalIncludeDirectories>C:\OpenCV\opencv-3.3.1\build\install\include\opencv;C:\OpenCV\opencv-3.3.1\build\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opencv_highgui331d.lib;opencv_core331d.lib;opencv_bgsegm331d.lib;opencv_stitching331d.lib;opencv_video331d.lib;opencv_imgcodecs331d.lib;opencv_objdetect331d.lib;opencv_imgproc331d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_highgui331d.lib;opencv_core331d.lib;opencv_bgsegm331d.lib;opencv_stitching331d.lib;opencv_video331d.lib;opencv_imgcodecs331d.lib;opencv_objdetect331d.lib;opencv_imgproc331d.lib;opencv_videoio331d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

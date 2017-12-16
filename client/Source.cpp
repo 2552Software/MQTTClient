@@ -30,7 +30,7 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/video/background_segm.hpp"
 #include "opencv2/bgsegm.hpp"
-
+#include "opencv2/videoio.hpp"
 #include "json.hpp"
 
 // for convenience
@@ -71,7 +71,67 @@ cv::Ptr<cv::BackgroundSubtractor> pMOG2; //MOG2 Background subtractor
 char keyboard; //input from keyboard
 char datatopic[128];//bugbug rm magic 
 static const char *s_topic = "/stuff";
+std::vector<uchar> jpgbytes; // from your db
+cv::VideoWriter *pVideoWriter = nullptr;
+int count = 0;
 
+// get raw from cam? what is the size difference? then let cv do the work?
+void tofile(const std::string& name, cv::InputArray &img) {
+	std::vector<int> compression_params; //vector that stores the compression parameters of the image
+
+	compression_params.push_back(CV_IMWRITE_JPEG_QUALITY); //specify the compression technique
+	compression_params.push_back(98); //specify the compression quality
+	/*
+	The image format is chosen depending on the file name extension. 
+	Only images with 8 bit or 16 bit unsigned  single channel or 
+	3 channel ( CV_8UC1, CV_8UC3, CV_8SC1, CV_8SC3, CV_16UC1, CV_16UC3) 
+	with 'BGR' channel order, can be saved. If the depth or channel order 
+	of the image is different, use 'Mat::convertTo()' or 'cvtColor' functions to 
+	convert the image to supporting format before using imwrite function.
+
+	params - This is a int vector to which you have to insert some int parameters specifying the format of the image
+	JPEG format - You have to puch_back CV_IMWRITE_JPEG_QUALITY first and then a number between 0 and 100 (higher is the better). 
+	If you want the best quality output, use 100. I have used 98 in the above sample program. 
+	But higher the value, it will take longer time to write the image
+	PNG format - You have to puch_back CV_IMWRITE_PNG_COMPRESSION first and then a number between 0 and 9 (higher is the better compression, but slower).
+	*/
+	bool bSuccess = cv::imwrite(name, img, compression_params); //write the image to file
+}
+
+void tovideo() {
+	double dWidth = 100;//get real value from input cap.get(CV_CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
+	double dHeight = 100;// cap.get(CV_CAP_PROP_FRAME_HEIGHT); //get the height of frames of the video
+
+	std::cout << "Frame Size = " << dWidth << "x" << dHeight << std::endl;
+
+	cv::Size frameSize(static_cast<int>(dWidth), static_cast<int>(dHeight));
+	cv::VideoWriter oVideoWriter("MyVideo.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, frameSize, true); //initialize the VideoWriter object 
+
+	if (!oVideoWriter.isOpened()) //if not initialize the VideoWriter successfully, exit the program
+	{
+		std::cout << "ERROR: Failed to write the video" << std::endl;
+		return;
+	}
+
+	while (1)
+	{
+		cv::Mat frame;
+		bool bSuccess = true;//cap.read(frame); // read a new frame from video
+		if (!bSuccess) //if not success, break loop
+		{
+			std::cout << "ERROR: Cannot read a frame from video file" << std::endl;
+			break;
+		}
+
+		oVideoWriter.write(frame); //writer the frame into the file
+		imshow("myVideo", frame); //show the frame in "MyVideo" window
+		if (cv::waitKey(10) == 27) //wait for 'esc' key press for 30ms. If 'esc' key is pressed, break loop
+		{
+			std::cout << "esc key is pressed by user" << std::endl;
+			break;
+		}
+	}
+}
 static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 	struct mg_mqtt_message *msg = (struct mg_mqtt_message *) p;
 	(void)nc;
@@ -150,6 +210,7 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 			std::string path = j["path"];
 			std::string name = j["name"];
 			printf("data ready %s %s\n", name.c_str(), path.c_str());
+			jpgbytes.clear(); // early draft of ideas here...
 			// create the file but this will
 			//need OpenCV wstream = fs.createWriteStream(cam1);
 		}
@@ -158,10 +219,107 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 			json j = json::parse(s);
 			std::string path = j["path"];
 			printf("data final (EOF) %s\n", path.c_str());
+			// incase we go to raw cv::Mat mat(height,width,CV_8UC3,string.data());   
+			if (jpgbytes.size() > 0) {
+				cv::Mat data_mat(jpgbytes, true);
+				if (!data_mat.empty()) {
+#define MAX_COUNT 250   
+#define DELAY_T 3
+#define PI 3.1415   
+
+					IplImage* image = 0;
+
+					//T, T-1 image   
+					IplImage* current_Img = 0;
+					IplImage* Old_Img = 0;
+
+					//Optical Image   
+					IplImage * imgA = 0;
+					IplImage * imgB = 0;
+
+					IplImage * eig_image = 0;
+					IplImage * tmp_image = 0;
+					int corner_count = MAX_COUNT;
+					CvPoint2D32f* cornersA = new CvPoint2D32f[MAX_COUNT];
+					CvPoint2D32f * cornersB = new CvPoint2D32f[MAX_COUNT];
+
+					CvSize img_sz;
+					int win_size = 20;
+
+					IplImage* pyrA = 0;
+					IplImage* pyrB = 0;
+
+					char features_found[MAX_COUNT];
+					float feature_errors[MAX_COUNT];
+					//////////////////////////////////////////////////////////////////////////   
+
+
+					//////////////////////////////////////////////////////////////////////////   
+					//Variables for time different video   
+					int one_zero = 0;
+					//int t_delay=0;   
+
+					double gH[9] = { 1,0,0, 0,1,0, 0,0,1 };
+					CvMat gmxH = cvMat(3, 3, CV_64F, gH);
+
+					//RGB to Gray for Optical Flow   
+//					cv::cvCvtColor(current_Img, imgA, CV_BGR2GRAY);
+	//				cvCvtColor(Old_Img, imgB, CV_BGR2GRAY);
+
+					//extract features next step, remove low change items
+					cvGoodFeaturesToTrack(imgA, eig_image, tmp_image, cornersA, &corner_count, 0.01, 5.0, 0, 3, 0, 0.04);
+					cvFindCornerSubPix(imgA, cornersA, corner_count, cvSize(win_size, win_size), cvSize(-1, -1), cvTermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03));
+
+					cv::Mat image2(cv::imdecode(data_mat, 1)); //put 0 if you want greyscale, 1 color
+					size_t sizeInBytes = image2.total() * image2.elemSize();
+					std::vector<uchar> buff;//buffer for coding
+					std::vector<int> param(2);
+					param[0] = cv::IMWRITE_JPEG_QUALITY;
+					param[1] = 50;//default(95) 0-100
+					cv::imencode(".jpg", image2, buff, param);
+					imshow("Frame", image2);
+					cv::Mat edges;
+					cv::cvtColor(image2, edges, cv::COLOR_BGR2GRAY);
+					GaussianBlur(edges, edges, cv::Size(7, 7), 1.5, 1.5);
+					Canny(edges, edges, 0, 30, 3);
+					sizeInBytes = edges.total() * edges.elemSize();
+					imshow("edges", edges);
+					cv::imwrite("test.png", edges);
+					if (pVideoWriter->isOpened()) {
+						printf("pVideoWriter->isOpened\n");
+						if (++count == 20) {
+							pVideoWriter->release(); // should be about 1 minute
+							delete pVideoWriter;
+							pVideoWriter = new cv::VideoWriter("MyVideo21.avi", CV_FOURCC('P', 'I', 'M', '1'), 2, cv::Size(640, 480), true); //initialize the VideoWriter object 
+						}
+						else if (count == 200) {
+							pVideoWriter->release();
+							delete pVideoWriter;
+							pVideoWriter = new cv::VideoWriter("MyVideo32.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+						}
+						else if (count == 300) {
+							pVideoWriter->release();
+							delete pVideoWriter;
+							pVideoWriter = new cv::VideoWriter("MyVideo43.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+						}
+						else if (count == 500) {
+							pVideoWriter->release();
+							delete pVideoWriter;
+							pVideoWriter = new cv::VideoWriter("MyVideo54.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+						}
+						pVideoWriter->write(image2);
+					}
+
+					cv::waitKey(3);
+				}
+			}
 			//wstream.end();
 		}
 		else if (mg_mqtt_vmatch_topic_expression("datacam1", msg->topic)) {
 			printf("raw data len %zd\n", msg->payload.len);
+			for (int i = 0; i < msg->payload.len; ++i) {
+				jpgbytes.push_back((uchar)msg->payload.p[i]);
+			}
 			//mg_hexdump(nc->recv_mbuf.buf, msg->payload.len, hex, sizeof(hex));
 			//wstream.write(message);
 		}
@@ -180,7 +338,7 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 			pMOG2->getBackgroundImage(background);
 			imshow("back", background);
 			imshow("Frame", frame);
-			imshow("FG Mask MOG 2", fgMaskMOG2);
+			imshow("mog", fgMaskMOG2);
 			//cv::imshow("Display window", img);
 			cv::waitKey(25);
 		}
@@ -196,9 +354,14 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 }
 
 int main(int argc, char **argv) {
+	pVideoWriter = new cv::VideoWriter("MyVideo.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640,480), true); //initialize the VideoWriter object 
+	if (pVideoWriter && pVideoWriter->isOpened()) {
+		printf("pVideoWriter->isOpened\n");
+	}
 	cv::namedWindow("back", cv::WINDOW_AUTOSIZE);
 	cv::namedWindow("Frame", cv::WINDOW_AUTOSIZE);
-	cv::namedWindow("FG Mask MOG 2", cv::WINDOW_AUTOSIZE);
+	cv::namedWindow("mog", cv::WINDOW_AUTOSIZE);
+	cv::namedWindow("myVideo", cv::WINDOW_AUTOSIZE);
 	//create Background Subtractor objects
 	pMOG2 = cv::createBackgroundSubtractorMOG2(); //MOG2 approach
 
