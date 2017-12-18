@@ -269,48 +269,61 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 					//extract features next step, remove low change items
 					cvGoodFeaturesToTrack(imgA, eig_image, tmp_image, cornersA, &corner_count, 0.01, 5.0, 0, 3, 0, 0.04);
 					cvFindCornerSubPix(imgA, cornersA, corner_count, cvSize(win_size, win_size), cvSize(-1, -1), cvTermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.03));
-
+					
 					cv::Mat image2(cv::imdecode(data_mat, 1)); //put 0 if you want greyscale, 1 color
 					size_t sizeInBytes = image2.total() * image2.elemSize();
 					std::vector<uchar> buff;//buffer for coding
 					std::vector<int> param(2);
 					param[0] = cv::IMWRITE_JPEG_QUALITY;
-					param[1] = 50;//default(95) 0-100
-					cv::imencode(".jpg", image2, buff, param);
+					param[1] = 30;//default(95) 0-100
+					//cv::imencode(".jpg", image2, buff, param);
 					imshow("Frame", image2);
+					std::string name = "bwz" + path;
+					cv::imwrite(name, image2, param);
+
 					cv::Mat edges;
 					cv::cvtColor(image2, edges, cv::COLOR_BGR2GRAY);
 					GaussianBlur(edges, edges, cv::Size(7, 7), 1.5, 1.5);
 					Canny(edges, edges, 0, 30, 3);
 					sizeInBytes = edges.total() * edges.elemSize();
 					imshow("edges", edges);
-					cv::imwrite("test.png", edges);
-					if (pVideoWriter->isOpened()) {
-						printf("pVideoWriter->isOpened\n");
-						if (++count == 20) {
-							pVideoWriter->release(); // should be about 1 minute
-							delete pVideoWriter;
-							pVideoWriter = new cv::VideoWriter("MyVideo21.avi", CV_FOURCC('P', 'I', 'M', '1'), 2, cv::Size(640, 480), true); //initialize the VideoWriter object 
+					cv::waitKey(10);
+					/*
+					//cv::imwrite("test.png", edges);
+					printf("pVideoWriter->isOpened\n");
+					if (++count == 1) {
+						//  CV_FOURCC('P', 'I', 'M', '1') or ? CV_FOURCC('M', 'J', 'P', 'G')
+						pVideoWriter = new cv::VideoWriter("MyVideoabc.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+						if (pVideoWriter && pVideoWriter->isOpened()) {
+							printf("pVideoWriter->isOpened\n");
 						}
-						else if (count == 200) {
-							pVideoWriter->release();
-							delete pVideoWriter;
-							pVideoWriter = new cv::VideoWriter("MyVideo32.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
-						}
-						else if (count == 300) {
-							pVideoWriter->release();
-							delete pVideoWriter;
-							pVideoWriter = new cv::VideoWriter("MyVideo43.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
-						}
-						else if (count == 500) {
-							pVideoWriter->release();
-							delete pVideoWriter;
-							pVideoWriter = new cv::VideoWriter("MyVideo54.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
-						}
+					}
+					else if (count == 100) {
+						pVideoWriter->release(); // should be about 1 minute
+						delete pVideoWriter;
+						//  CV_FOURCC('P', 'I', 'M', '1') or ? CV_FOURCC('M', 'J', 'P', 'G')
+						pVideoWriter = new cv::VideoWriter("MyVideo21.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+					}
+					else if (count == 200) {
+						pVideoWriter->release();
+						delete pVideoWriter;
+						pVideoWriter = new cv::VideoWriter("MyVideo32.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+					}
+					else if (count == 300) {
+						pVideoWriter->release();
+						delete pVideoWriter;
+						pVideoWriter = new cv::VideoWriter("MyVideo43.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+					}
+					else if (count == 500) {
+						pVideoWriter->release();
+						delete pVideoWriter;
+						pVideoWriter = new cv::VideoWriter("MyVideo54.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640, 480), true); //initialize the VideoWriter object 
+					}
+					if (pVideoWriter) {
 						pVideoWriter->write(image2);
 					}
-
-					cv::waitKey(3);
+					cv::waitKey(100);
+					*/
 				}
 			}
 			//wstream.end();
@@ -354,10 +367,6 @@ static void ev_handler(struct mg_connection *nc, int ev, void *p) {
 }
 
 int main(int argc, char **argv) {
-	pVideoWriter = new cv::VideoWriter("MyVideo.avi", CV_FOURCC('P', 'I', 'M', '1'), 20, cv::Size(640,480), true); //initialize the VideoWriter object 
-	if (pVideoWriter && pVideoWriter->isOpened()) {
-		printf("pVideoWriter->isOpened\n");
-	}
 	cv::namedWindow("back", cv::WINDOW_AUTOSIZE);
 	cv::namedWindow("Frame", cv::WINDOW_AUTOSIZE);
 	cv::namedWindow("mog", cv::WINDOW_AUTOSIZE);
